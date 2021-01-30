@@ -1,7 +1,7 @@
 import sqlite3
 from dateutil import parser
 from tomo import tomo_day, noww
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, render_template
 from flask.helpers import make_response
 from werkzeug.security import check_password_hash, generate_password_hash
 import random
@@ -34,7 +34,8 @@ try :
         user_id           INTEGER,
         title             VARCHAR,
         date              DATETIME NOT NULL,
-        description       VARCHAR
+        description       VARCHAR,
+        FOREIGN KEY(user_id) REFERENCES users(public_id) ON DELETE CASCADE
     );
 
     CREATE TABLE status (
@@ -47,24 +48,28 @@ try :
         m_repeats         BOOLEAN NOT NULL, 
         y_repeats         BOOLEAN NOT NULL, 
         deadline          DATETIME, 
-        remainders        VARCHAR
+        remainders        VARCHAR,
+        FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        FOREIGN KEY(user_id) REFERENCES users(public_id) ON DELETE CASCADE
+
     );
 
     CREATE TABLE priority (
         task_id           INTEGER UNIQUE,
         red               BOOLEAN,
         yellow            BOOLEAN,
-        green             BOOLEAN
+        green             BOOLEAN DEFAULT 1,
+        FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
     );
 
     CREATE TABLE project (
         p_id              INTEGER PRIMARY KEY UNIQUE,
         task_id           INTEGER UNIQUE,
-        personal          BOOLEAN,
+        personal          BOOLEAN DEFAULT 1,
         shopping          BOOLEAN,
         family            BOOLEAN,
-        work              BOOLEAN
-
+        work              BOOLEAN,
+        FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
     )
     '''
     )
@@ -125,33 +130,10 @@ def post_register():
 @app.route('/', methods=['GET'])
 def home():
 
-    if not ('public_id' in session ):
-        return jsonify({
-            'Message' : 'Login to access this page'
-        }),401
+    if not ('username' in session ) :
+        session['username'] = False
 
-
-    cur = conn.cursor()
-    cur.execute('''
-    SELECT * FROM users
-    ''')
-    users = cur.fetchall()
-
-    output = []
-
-# [(1, 42762, 'vital', 'vital', 'k', 'sha256$IS3Kw0dI$7c93a652bba19d133db37b10c0e21ae26e2234a45843625341f3638392b9538b', 'vital@gmail.com')]
-
-    for user in users :
-        home = {}
-        home['id'] = user[0]
-        home['public_id'] = user[1]
-        home['username'] = user[2]
-        home['emailaddress'] = user[-1]
-        output.append(home)
-
-    return jsonify({'home':{
-        'Users':output
-        }})
+    return render_template('index.html', username = session['username'])
 
 @app.route('/login', methods=['POST'])
 def signin() :
@@ -171,19 +153,19 @@ def signin() :
 
     if not user:
         return jsonify({
-            'Message' : "No such user."
+            'message' : "No such user."
         })
 
     if check_password_hash(user[5], data['password']) :
         session['emailaddress'] = data['emailaddress']
         session['public_id'] = user[1]
-
+        session['username'] = user[2]
         return jsonify({
-            'Message' : 'You are logged in',
+            'message' : 'You are logged in',
         }),200
 
     return jsonify({
-        'Message' : "Emailaddress or Password does not match"
+        'message' : "Emailaddress or Password does not match"
     })
 
 
@@ -196,6 +178,7 @@ def user() :
 
     session.pop('public_id')
     session.pop('emailaddress')
+    session.pop('username')
 
     return make_response('logged out user', 200)
 
@@ -212,6 +195,11 @@ def post_task():
     cur = conn.cursor()
     data = request.get_json(force=True)
 
+    if not data['title'] :
+        return jsonify({'message':'Enter the title'})
+    if not data['description'] :
+        return jsonify({'message':'Enter the description'})
+
     if not 'date' in data :
         data['date'] = noww()
 
@@ -226,13 +214,14 @@ def post_task():
     ''', (data['title'], data['description'], session['public_id'], data['date']))
     task = cur.fetchone()
 
-    if not 'repeats' in data :
-        if not 'd_repeats' in data['repeats']['d_repeats'] :
-            data['d_repeats'] = False
-        if not 'm_repeats' in data['repeats']['m_repeats'] :
-            data['m_repeats'] = False
-        if not 'y_repeats' in data['repeats']['y_repeats'] :
-            data['y_repeats'] = False
+    # print(data)
+    if 'repeats' in data :
+        if not 'd_repeats' in data['repeats'] :
+            data['repeats']['d_repeats'] = False
+        if not 'm_repeats' in data['repeats'] :
+            data['repeats']['m_repeats'] = False
+        if not 'y_repeats' in data['repeats'] :
+            data['repeats']['y_repeats'] = False
 
     if not 'deadline' in data :
         data['deadline'] = tomo_day()
@@ -379,19 +368,57 @@ def get_tasks():
     ''', (session['public_id'], ))
     tasks = cur.fetchall()
 
+    cur.execute(
+    '''
+    SELECT * FROM status WHERE user_id = ? 
+    ''', (session['public_id'], ))
+    user_status = cur.fetchall()
+
     output = []
-    for task in tasks :
+    for status,task in zip(user_status, tasks) :
+        cur.execute(
+        '''
+        SELECT * FROM project WHERE task_id = ? 
+        ''', (task[0], ))
+        project = cur.fetchone()
+
+        cur.execute(
+        '''
+        SELECT * FROM priority WHERE task_id = ? 
+        ''', (task[0], ))
+        priority = cur.fetchone()
+
         t_dict = {}
+        priority_dict = {}
+        project_dict = {}
+        repeat_dict = {}
         t_dict['id'] = task[0]
         t_dict['user_id'] = task[1]
         t_dict['title'] = task[2]
         t_dict['date'] = task[3]
         t_dict['description'] = task[-1]
+        if project :
+            project_dict['personal'] = project[2]
+            project_dict['shopping'] = project[3]
+            project_dict['family'] = project[-2]
+            project_dict['work'] = project[-1]
+        t_dict['project'] = project_dict
+        if priority :
+            priority_dict['red'] = priority[1]
+            priority_dict['yellow'] = priority[2]
+            priority_dict['green'] = priority[3]
+        t_dict['priority'] = priority_dict
+
+        if status :
+            repeat_dict['daily'] = status[5]
+            repeat_dict['monthly'] = status[6]
+            repeat_dict['yearly'] = status[7]
+        t_dict['repeats'] = repeat_dict
         output.append(t_dict)
 
-    return jsonify({'home':{
+    return jsonify({
         'Tasks':output
-        }})
+        })
 
 @app.route('/task/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
@@ -521,32 +548,33 @@ def complete_task(task_id):
     ''', (data['deadline'], task[0]))
         conn.commit()
         # print('deadline')
+    
+    if 'repeats' in data :
+        if 'd_repeats' in data['repeats'] :
+            cur.execute(
+        '''
+        UPDATE status SET d_repeats = ? 
+        WHERE task_id = ?
+        ''', (data['repeats']['d_repeats'], task[0]))
+            conn.commit()
+            # print('d repeats')
 
-    if 'd_repeats' in data['repeats'] :
-        cur.execute(
-    '''
-    UPDATE status SET d_repeats = ? 
-    WHERE task_id = ?
-    ''', (data['repeats']['d_repeats'], task[0]))
-        conn.commit()
-        # print('d repeats')
+        if 'm_repeats' in data['repeats'] :
+            cur.execute(
+        '''
+        UPDATE status SET m_repeats = ? 
+        WHERE task_id = ?
+        ''', (data['repeats']['m_repeats'], task[0]))
+            conn.commit()
+            # print('m repeats')
 
-    if 'm_repeats' in data['repeats'] :
-        cur.execute(
-    '''
-    UPDATE status SET m_repeats = ? 
-    WHERE task_id = ?
-    ''', (data['repeats']['m_repeats'], task[0]))
-        conn.commit()
-        # print('m repeats')
-
-    if 'y_repeats' in data['repeats']:
-        cur.execute(
-    '''
-    UPDATE status SET y_repeats = ? 
-    WHERE task_id = ?
-    ''', (data['repeats']['y_repeats'], task[0]))
-        conn.commit()
+        if 'y_repeats' in data['repeats']:
+            cur.execute(
+        '''
+        UPDATE status SET y_repeats = ? 
+        WHERE task_id = ?
+        ''', (data['repeats']['y_repeats'], task[0]))
+            conn.commit()
         # print('y repeats')
 
     if 'remainders' in data:
@@ -557,67 +585,68 @@ def complete_task(task_id):
     ''', (data['remainders'],task[0]))
         conn.commit()
         # print('remainders')
+    if 'priority' in data :
+        if 'red' in data['priority'] :
+            cur.execute(
+            '''
+            UPDATE priority SET red = ? 
+            WHERE task_id = ?
+            ''', (data['priority']['red'], task[0]))
+            conn.commit()
 
-    if 'red' in data['priority'] :
-        cur.execute(
-        '''
-        UPDATE priority SET red = ? 
-        WHERE task_id = ?
-        ''', (data['priority']['red'], task[0]))
-        conn.commit()
+        if 'yellow' in data['priority'] :
+            cur.execute(
+            '''
+            UPDATE priority SET yellow = ? 
+            WHERE task_id = ?
+            ''', (data['priority']['yellow'], task[0]))
+            conn.commit()
 
-    if 'yellow' in data['priority'] :
-        cur.execute(
-        '''
-        UPDATE priority SET yellow = ? 
-        WHERE task_id = ?
-        ''', (data['priority']['yellow'], task[0]))
-        conn.commit()
+        if 'green' in data['priority'] :
+            cur.execute(
+            '''
+            UPDATE priority SET green = ? 
+            WHERE task_id = ?
+            ''', (data['priority']['green'], task[0]))
+            conn.commit()
 
-    if 'green' in data['priority'] :
-        cur.execute(
-        '''
-        UPDATE priority SET green = ? 
-        WHERE task_id = ?
-        ''', (data['priority']['green'], task[0]))
-        conn.commit()
+    if 'project' in data :
+        if 'personal' in data['project'] :
+            cur.execute(
+            '''
+            UPDATE project SET personal = ? 
+            WHERE  task_id = ? 
+            ''', (data['project']['personal'], task[0]))
+            conn.commit()
 
-    if 'personal' in data['project'] :
-        cur.execute(
-        '''
-        UPDATE project SET personal = ? 
-        WHERE  task_id = ? 
-        ''', (data['project']['personal'], task[0]))
-        conn.commit()
+        if 'shopping' in data['project'] :
+            cur.execute(
+            '''
+            UPDATE project SET shopping = ? 
+            WHERE task_id = ?
+            ''', (data['project']['shopping'], task[0]))
+            conn.commit()
 
-    if 'shopping' in data['project'] :
-        cur.execute(
-        '''
-        UPDATE project SET shopping = ? 
-        WHERE task_id = ?
-        ''', (data['project']['shopping'], task[0]))
-        conn.commit()
+        if 'family' in data['project'] :
+            cur.execute(
+            '''
+            UPDATE project SET family = ? 
+            WHERE task_id = ?
+            ''', (data['project']['family'], task[0]))
+            conn.commit()
 
-    if 'family' in data['project'] :
-        cur.execute(
-        '''
-        UPDATE project SET family = ? 
-        WHERE task_id = ?
-        ''', (data['project']['family'], task[0]))
-        conn.commit()
-
-    if 'family' in data['project'] :
-        cur.execute(
-        '''
-        UPDATE project SET family = ? 
-        WHERE task_id = ?
-        ''', (data['project']['family'], task[0]))
-        conn.commit()
+        if 'work' in data['project'] :
+            cur.execute(
+            '''
+            UPDATE project SET work = ? 
+            WHERE task_id = ?
+            ''', (data['project']['work'], task[0]))
+            conn.commit()
     
     return jsonify({
         'Task' : "task is updated!!!",
         'Status' : 'status is updated'
-    })
+    }), 200
 
 
 if __name__ == "__main__":

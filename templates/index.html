@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html ng-app="todoApp">
+<head>
+	<title>Task Management</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="icon" href="{{ url_for('static', filename='images/fav.ico') }}"/>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+	<!-- Add app.css -->
+	<link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='css/app.css') }}">
+	<!-- JQuery -->
+	<script src="https://code.jquery.com/jquery-3.1.1.slim.min.js"></script>
+	<!-- Bootstrap -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"/>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+	<!-- Angular magic goes here -->
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.1/angular.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.6.1/angular-route.min.js"></script>
+	<script type="text/javascript" src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+	<!-- Fontawesome magic goes here -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"/>
+
+	<!-- Sweet alerts magic goes here -->
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/1.1.3/sweetalert.min.css" />
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/sweetalert/1.1.3/sweetalert.min.js"></script>
+</head>
+<body class="bg" ng-controller="TodoController">
+<script type="text/javascript">
+	$(".collapse").collapse("hide");
+</script>
+<nav class="navbar navbar-custom navbar-fixed-top">
+	<div class="row well container-fluid">
+		<div class="container">
+		<div class="navbar-header text-center">
+			<img id="icon" href="/" src = "{{ url_for('static' , filename='images/icon.png') }}" alt="" />
+		</div>
+		<!--Links-->
+			<ul class="nav navbar-nav navbar-right">
+				<li class="nav-item" data-toggle="modal" data-target="#aboutModal">
+					<a class="nav-link" href="#">About</a>
+				</li>
+				{% if username %}
+				<li class="nav-item dropdown">
+					<a class="nav-link dropdown-toggle" data-toggle="dropdown" href="#">{{ username | capitalize }}<b class="caret"></b></a>
+				<ul class="dropdown-menu">
+				<li style="cursor: pointer;"><a ng-click="logout()">Logout</a></li>
+				</ul>
+				</li>
+				{% endif %}
+			</ul>
+		</div>
+	</div>
+	<!-- Main Content Goes Here -->
+</nav>
+	{% if not username %}
+	<div id="main-wrapper" class="bg">
+		<div class="card card-1">
+			<h5 class="text-muted">Howdi user,<br>Login/Signup and start ticking off those tasks!</h5>
+			<div class="pull-right">
+				<button data-toggle="modal" data-target="#loginModal" class="btn btn-primary">Login</button>&nbsp;
+				<button data-toggle="modal" data-target="#signupModal" class="btn btn-success">Signup</button>
+			</div>
+		<!-- </div> -->
+		<!-- Login Modal -->
+		<div class="modal fade" id="loginModal" role="dialog">
+			<div class="modal-dialog" >
+				<div class="modal-content">
+					<div class="modal-body">
+					<h5 class="lead text-center text-muted">Login</h5>
+					<form ng-submit="login()">
+						<div class="form-group">
+							<label class="text-success">Email address: </label>&nbsp;<input class="form-control" ng-model="login.emailaddress" type="email" name="emailaddress">
+						</div>
+
+						<div class="form-group">
+							<label class="text-success">Password: </label>&nbsp;<input class="form-control" ng-model="login.password" type="password" name="password">
+						</div>
+
+						<div class="form-group">
+							<input class="btn btn-success" type="submit" name="login" value="Login">
+						</div>
+					</form>			
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Signup Modal -->
+		<div class="modal fade" id="signupModal" role="dialog">
+			<div class="modal-dialog" >
+				<div class="modal-content">
+					<div class="modal-body">
+						<form ng-submit="signup()">
+						<div class="form-group">
+							<label class="text-success">Username: </label>&nbsp;<input class="form-control" ng-model="signup.username"type="text" name="username" placeholder="Case insensitive">
+						</div>
+
+						<div class="form-group">
+							<label class="text-success">emailaddress: </label>&nbsp;<input class="form-control" ng-model="signup.emailaddress"type="emailaddress" name="emailaddress">
+						</div>
+
+						<div class="form-group">
+							<label class="text-success">Firstname: </label>&nbsp;<input class="form-control" ng-model="signup.firstname"type="firstname" name="firstname">
+						</div>
+
+						<div class="form-group">
+							<label class="text-success">lastname: </label>&nbsp;<input class="form-control" ng-model="signup.lastname"type="lastname" name="lastname">
+						</div>
+
+						<div class="form-group">
+							<label class="text-success">Password: </label>&nbsp;<input class="form-control" ng-model="signup.password"type="password" name="password">
+						</div>
+
+						<div class="form-group">
+							<input class="btn btn-success" type="submit" name="signup" value="Signup">
+						</div>
+							
+						</form>			
+					</div>
+				</div>
+			</div>
+		</div>
+		</div>
+	{% else %}
+	<div id="main-wrapper" class="bg">
+		<div class="card card-1">
+			<h5 class="text-muted">Howdi {{ username }},<br> now you can add and strike off those tasks you want to keep track of from here!</h5>
+			<div class="btn-group">
+				<button data-toggle="modal" data-target="#tasksModal" class="btn btn-info" ng-click="getTasks()">Tasks</button>
+			</div>
+		</div>
+		<div class="modal fade" id="tasksModal" role="dialog">
+			<div class="modal-dialog" style="width: 100%;">
+				<div class="modal-content">
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+						<h4 class="modal-title text-center">Your Tasks</h4>
+					</div>
+					<div class="modal-body">
+						<div class="form-group">
+							<i class="fa fa-plus-circle" data-toggle="collapse" data-target="#newTaskForm" style="font-size: xx-large;" aria-hidden="true"></i>
+						</div>
+						<form id="newTaskForm" class="collapse">	
+						<div class="form-group">
+							<input type="text" class="form-control" style="border:0px;background-color: transparent;border-bottom:10px;" ng-model="newTask.title" placeholder="Enter task title">
+							<input type="text" class="form-control" style="border:0px;background-color: transparent;" ng-model="newTask.remainder" name="remainder" placeholder="Remaind As">
+							<textarea class="form-control" style="border:0px;background-color: transparent;" ng-model="newTask.content" placeholder="Enter task details/content/sub-tasks"></textarea>
+							<p>Repeats</p>
+							<label>Daily<input type="checkbox" class="form-control" style="border:0px;border-top:5px;background-color: transparent;" ng-click="newTask.repeats.monthly = false; newTask.repeats.yearly = false; newTask.repeats.daily = true;" ng-model="newTask.repeats.daily" name="Daily"></label>
+							<label>Monthly<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-click="newTask.repeats.monthly = true; newTask.repeats.yearly = false; newTask.repeats.daily = false;" ng-model="newTask.repeats.month" name="month" value="monthly"></label>
+							<label>Anually<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-click="newTask.repeats.monthly = false; newTask.repeats.yearly = true; newTask.repeats.daily = false;" ng-model="newTask.repeats.year" name="Year"></label>
+							<p>Priority</p>
+							<label>Urgent<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-click="newTask.priority.yellow = false; newTask.priority.green = false; newTask.priority.red = true;" ng-model="newTask.priority.red" name="red"></label>
+							<label>Important<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-click="newTask.priority.yellow = true; newTask.priority.green = false;newTask.priority.red = false; " ng-model="newTask.priority.yellow" name="yellow"></label>
+							<label>Normal<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-click="newTask.priority.yellow = false; newTask.priority.green = true; newTask.priority.red = false;" ng-model="newTask.priority.green" name="green"></label>
+							<p>Project</p>
+							<label>Personal<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-model="newTask.project.personal" name="personal"></label>
+							<label>Family<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-model="newTask.project.family" name="family"></label>
+							<label>Work<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-model="newTask.project.work" name="work"></label>
+							<label>Shopping<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-model="newTask.project.shopping" name="shopping"></label>
+							<p>Deadline</p>
+							<label >Due Date: <input type="date" style="border:0px;background-color: transparent;" ng-model="newTask.duedate" name="duedate"></label><br>
+							
+							<i class="fa fa-floppy-o text-success pull-right" ng-click="saveTask(newTask)" aria-hidden="true"></i>
+						</div>
+						</form>
+						<div id='task_div_[[ $index+1 ]]' ng-repeat="(taskIndex,task) in tasks">
+						<form>
+						<div class="form-group">
+							<input type="text" class="form-control" style="border:0px;background-color: transparent;" ng-model="task.title" ng-change="titleChanged(task.title,task.id)">
+							
+							<textarea class="form-control" style="border:0px;background-color: transparent;" ng-model="task.description" ng-change="contentChanged(task.description,task.id)">
+							[[ task.discription ]]
+							</textarea>
+							<p><strong>Priority</strong></p>
+							<label>Urgent<input type="checkbox" class="form-control priority"  style="border:0px;background-color: transparent;" ng-click="task.priority.yellow = false; task.priority.green = false; " ng-checked=[[task.priority.red]] ng-model="task.priority.red" ng-change="contentChanged(task.priority.red,task.id)">[[task.priority.red]]</label>
+							<label>Important<input type="checkbox" class="form-control priority"  style="border:0px;background-color: transparent;" ng-click="task.priority.red = false; task.priority.green = false; " ng-checked=[[task.priority.yellow]] ng-model="task.priority.yellow" ng-change="contentChanged(task.priority.yellow,task.id)">[[task.priority.yellow]]</label>
+							<label>Normal<input type="checkbox" class="form-control priority"  style="border:0px;background-color: transparent;" ng-click="task.priority.red = false; task.priority.yellow = false; " ng-checked=[[task.priority.green]] ng-model="task.priority.green" ng-change="contentChanged(task.priority.green,task.id)">[[task.priority.green]]</label>
+							
+							<br>
+							<p><strong>project</strong></p>
+							<label>Personal<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-checked=[[task.project.personal]] ng-model="task.project.personal" ng-change="contentChanged(task.project.personal,task.id)">[[task.project.personal]]</label>
+							<label>Family<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-checked=[[task.project.family]] ng-model="task.project.family" ng-change="contentChanged(task.project.family,task.id)">[[task.project.family]]</label>
+							<label>Work<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-checked=[[task.project.work]] ng-model="task.project.work" ng-change="contentChanged(task.project.work,task.id)">[[task.project.work]]</label>
+							<label>Shopping<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-checked=[[task.project.shopping]] ng-model="task.project.shopping" ng-change="contentChanged(task.project.shopping,task.id)">[[task.project.shopping]]</label>
+							
+							<p><strong>Repeats</strong></p>
+							<label>Daily<input type="checkbox" class="form-control" style="border:0px;border-top:5px;background-color: transparent;" ng-click="task.repeats.monthly = false; task.repeats.yearly = false; task.repeats.daily = true;" ng-checked=[[task.repeats.daily]] ng-model="task.repeats.daily" ng-change="contentChanged(task.repeats.daily,task.id)">[[task.repeats.daily]]</label>
+							<label>Monthly<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-model="task.repeats.monthly" ng-click="task.repeats.monthly = true; task.repeats.yearly = false; task.repeats.daily = false;" ng-checked=[[task.repeats.monthly]] ng-model="task.repeats.monthly" ng-change="contentChanged(task.repeats.monthly,task.id)">[[task.repeats.monthly]]</label>
+							<label>Anually<input type="checkbox" class="form-control" style="border:0px;background-color: transparent;" ng-model="task.repeats.yearly" ng-click="task.repeats.monthly = false; task.repeats.yearly = true; task.repeats.daily = false;" ng-checked=[[task.repeats.yearly]] ng-model="task.repeats.yearly" ng-change="contentChanged(task.repeats.year,task.id)">[[task.repeats.yearly]]</label>
+							<div class="btn-group pull-right">
+							<i class="fa fa-floppy-o text-success" ng-click="saveChanges(taskIndex,task)" aria-hidden="true"></i>
+							<i class="fa fa-trash text-warning" ng-click="removeTask(taskIndex,task)" aria-hidden="true"></i>
+							<i class="fa fa-check text-primary" ng-click="markAsCompleted(taskIndex,task)" aria-hidden="true"></i>
+							</div>
+							<hr class="featurette-divider" style="border-top-width: 0.05px;">
+						</div>
+						</form>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+	{% endif %}
+		<!-- About Modal -->
+		<div class="modal fade" id="aboutModal" role="dialog">
+			<div class="modal-dialog">
+				<div class="modal-content">
+					<div class="modal-body">
+						<h5 class="lead text-center text-muted">About</h5>
+						<p class="text-info">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed porttitor mauris a dignissim molestie. Aenean id ante commodo, consequat metus id, mattis nisl. Nulla quis tortor imperdiet, molestie nisl vel. </p>
+						<p class="text-info">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce accumsan odio vel dolor lacinia, sit amet mollis dui sodales. Duis gravida magna eget tristique efficitur. Aenean dignissim nisl vel enim interdum viverra. Duis metus lorem, facilisis quis ornare a, porttitor.</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>
